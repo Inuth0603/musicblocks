@@ -719,6 +719,7 @@ class Block {
      * @returns {void}
      */
     resize(scale) {
+
         /**
          * After the new artwork is created, this function is used to add decorations.
          * @returns {void}
@@ -1000,8 +1001,30 @@ class Block {
             this.container.removeChild(this.highlightCollapseBlockBitmap);
         }
 
+        // Temporarily remove imageBitmap to prevent it from corrupting bounds during regeneration
+        let tempImageBitmap = null;
+        if (this.imageBitmap != null) {
+            tempImageBitmap = this.imageBitmap;
+            this.container.removeChild(this.imageBitmap);
+            this.imageBitmap = null;
+        }
+
         // Then we generate new artwork.
         this.generateArtwork(false);
+
+        // Restore the imageBitmap after artwork generation
+        if (tempImageBitmap != null) {
+            this.imageBitmap = tempImageBitmap;
+            this.container.addChild(this.imageBitmap);
+            this._positionMedia(
+                this.imageBitmap,
+                this.imageBitmap.image.width,
+                this.imageBitmap.image.height,
+                this.protoblock.scale
+            );
+            const zIndex = this.container.children.length - 1;
+            this.container.setChildIndex(this.imageBitmap, zIndex);
+        }
     }
 
     /**
@@ -2086,7 +2109,7 @@ class Block {
      */
     _doOpenMedia(thisBlock) {
         const that = this;
-        const fileChooser = that.name=="media" ? docById("myMedia") : docById("audio");
+        const fileChooser = that.name == "media" ? docById("myMedia") : docById("audio");
 
         const __readerAction = () => {
             window.scroll(0, 0);
@@ -2714,17 +2737,22 @@ class Block {
      * @returns {void}
      */
     _positionMedia(bitmap, width, height, blockScale) {
-        if (width > height) {
-            bitmap.scaleX = bitmap.scaleY = bitmap.scale =
-                ((MEDIASAFEAREA[2] / width) * blockScale) / 2;
-        } else {
-            bitmap.scaleX = bitmap.scaleY = bitmap.scale =
-                ((MEDIASAFEAREA[3] / height) * blockScale) / 2;
-        }
+        // Use actual block dimensions instead of MEDIASAFEAREA to ensure image fits
+        // Account for padding (approximately 20% of block size for margins)
+        const maxWidth = this.width * 0.6;  // Leave 40% for block chrome
+        const maxHeight = this.height * 0.6; // Leave 40% for block chrome
+
+        // Calculate scale to fit within both dimensions
+        const scaleX = maxWidth / width;
+        const scaleY = maxHeight / height;
+
+        // Use the minimum to ensure it fits in both dimensions
+        bitmap.scaleX = bitmap.scaleY = bitmap.scale = Math.min(scaleX, scaleY);
+
+        // Center the image within the block
         bitmap.x = ((MEDIASAFEAREA[0] - 10) * blockScale) / 2;
         bitmap.y = (MEDIASAFEAREA[1] * blockScale) / 2;
     }
-
     /**
      * Position the label for a collapsed block.
      * @private
@@ -2795,7 +2823,7 @@ class Block {
          * @param {Event} event - The click event.
          */
         this.container.on("click", (event) => {
-            if(docById("helpfulWheelDiv") && docById("helpfulWheelDiv").style.display !== "none") {
+            if (docById("helpfulWheelDiv") && docById("helpfulWheelDiv").style.display !== "none") {
                 docById("helpfulWheelDiv").style.display = "none";
             }
             // We might be able to check which button was clicked.
@@ -2902,7 +2930,7 @@ class Block {
          * Handles the mousedown event on the block container.
          * @param {Event} event - The mousedown event.
          */
-        this.container.on("mousedown", (event) =>{
+        this.container.on("mousedown", (event) => {
             docById("contextWheelDiv").style.display = "none";
 
             // Track time for detecting long pause...
@@ -2928,7 +2956,7 @@ class Block {
                     return;
                 }
             }
-            
+
             // Always show the trash when there is a block selected,
             that.activity.trashcan.show();
 
@@ -2959,7 +2987,7 @@ class Block {
          * Handles the pressmove event on the block container.
          * @param {Event} event - The pressmove event.
          */
-        this.container.on("pressmove", (event) =>{
+        this.container.on("pressmove", (event) => {
             // FIXME: More voodoo
             event.nativeEvent.preventDefault();
 
@@ -2993,10 +3021,10 @@ class Block {
                 setTimeout(() => {
                     moved =
                         Math.abs(event.stageX / that.activity.getStageScale() - that.original.x) +
-                            Math.abs(
-                                event.stageY / that.activity.getStageScale() - that.original.y
-                            ) >
-                            20 && !window.hasMouse;
+                        Math.abs(
+                            event.stageY / that.activity.getStageScale() - that.original.y
+                        ) >
+                        20 && !window.hasMouse;
                     getInput = !moved;
                 }, 200);
             }
@@ -3075,7 +3103,7 @@ class Block {
          * Unhighlights the block and resets the active block.
          * @param {Event} event - The mouseout event object.
          */
-        this.container.on("mouseout", (event) =>{
+        this.container.on("mouseout", (event) => {
             if (!that.blocks.getLongPressStatus()) {
                 that._mouseoutCallback(event, moved, haveClick, false);
             } else {
@@ -3098,7 +3126,7 @@ class Block {
          * Unhighlights the block and resets the active block.
          * @param {Event} event - The pressup event object.
          */
-        this.container.on("pressup", (event) =>{
+        this.container.on("pressup", (event) => {
             if (!that.blocks.getLongPressStatus()) {
                 that._mouseoutCallback(event, moved, haveClick, false);
             } else {
@@ -4018,7 +4046,7 @@ class Block {
              * @param {Event} event - The blur event object.
              * @returns {void}
              */
-            const __blur = (event) =>{
+            const __blur = (event) => {
                 // Not sure why the change in the input is not available
                 // immediately in FireFox. We need a workaround if hardware
                 // acceleration is enabled.
@@ -4062,7 +4090,7 @@ class Block {
              * @param {Event} event - The keypress event object.
              * @returns {void}
              */
-            let __keypress = (event) =>{
+            let __keypress = (event) => {
                 if ([13, 10, 9].includes(event.keyCode)) {
                     __blur(event);
                 }
@@ -4077,12 +4105,12 @@ class Block {
             this.label.style.left =
                 Math.round(
                     (x + this.activity.blocksContainer.x) * this.activity.getStageScale()
-                        + canvasLeft
+                    + canvasLeft
                 ) + "px";
             this.label.style.top =
                 Math.round(
                     (y + this.activity.blocksContainer.y) * this.activity.getStageScale()
-                        + canvasTop
+                    + canvasTop
                 ) + "px";
             this.label.style.width =
                 Math.round((selectorWidth * this.blocks.blockScale * this.protoblock.scale) / 2) +
@@ -4433,8 +4461,8 @@ class Block {
                 this.activity.refreshCanvas();
                 this.value = oldValue;
             }
-            
-            if(cblk1 != null && this.blocks.blockList[cblk1].name === "pitch" && (this.value > 8 || this.value < 1)) {
+
+            if (cblk1 != null && this.blocks.blockList[cblk1].name === "pitch" && (this.value > 8 || this.value < 1)) {
                 const thisBlock = this.blocks.blockList.indexOf(this);
                 this.activity.errorMsg(_("Octave value must be between 1 and 8."), thisBlock);
                 this.activity.refreshCanvas();
@@ -4442,7 +4470,7 @@ class Block {
                 this.value = oldValue;
             }
 
-            if(String(this.value).length > 10) {
+            if (String(this.value).length > 10) {
                 const thisBlock = this.blocks.blockList.indexOf(this);
                 this.activity.errorMsg(_("Numbers can have at most 10 digits."), thisBlock);
                 this.activity.refreshCanvas();
