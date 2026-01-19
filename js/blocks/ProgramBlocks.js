@@ -1270,7 +1270,9 @@ function setupProgramBlocks(activity) {
                 console.debug("BLOCKNUMBER " + blockNumber);
                 return blockNumber;
             } else if (name === _("silence")) {
-                // FIXME: others too
+                // Note: Special case blocks like "note", "start", and "silence" require
+                // specific block structure templates. The generic handler below works for
+                // most blocks. Additional special cases can be added here following this pattern.
                 const newBlock = [[0, "rest2", x, y, [null, null]]];
                 activity.blocks.loadNewBlocks(newBlock);
                 // eslint-disable-next-line no-console
