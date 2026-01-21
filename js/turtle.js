@@ -86,24 +86,33 @@ class Turtle {
     }
 
     /**
-     * Internal function for creating cache.
+     * Internal function for creating cache with safety limit.
      * Includes workaround for a race condition.
      *
      * @private
+     * @param {Number} [retryCount=0] - current retry attempt
      */
-    _createCache() {
+    _createCache(retryCount = 0) {
+        const MAX_RETRIES = 20; // Stop after ~4 seconds
         this.bounds = this.container.getBounds();
 
         if (this.bounds == null) {
-            setTimeout(() => {
-                this._createCache();
-            }, 200);
+            if (retryCount < MAX_RETRIES) {
+                setTimeout(() => {
+                    this._createCache(retryCount + 1);
+                }, 200);
+            } else {
+                // eslint-disable-next-line no-console
+                console.warn(`Failed to cache container for Turtle ${this.name} after ${MAX_RETRIES} attempts.`);
+            }
         } else {
+            // Add a padding to the bounds to ensure strokes aren't cut off
+            const padding = 2;
             this.container.cache(
-                this.bounds.x,
-                this.bounds.y,
-                this.bounds.width,
-                this.bounds.height
+                this.bounds.x - padding,
+                this.bounds.y - padding,
+                this.bounds.width + (padding * 2),
+                this.bounds.height + (padding * 2)
             );
         }
     }
@@ -185,122 +194,14 @@ class Turtle {
 
         this.inSetTimbre = false;
 
+        // Reset Painter defaults
         this.painter.cp1x = 0;
         this.painter.cp1y = 100;
         this.painter.cp2x = 100;
         this.painter.cp2y = 100;
 
-        /** @deprecated */ this.singer.attack = [];
-        /** @deprecated */ this.singer.decay = [];
-        /** @deprecated */ this.singer.sustain = [];
-        /** @deprecated */ this.singer.release = [];
-
-        this.singer.scalarTransposition = 0;
-        this.singer.scalarTranspositionValues = [];
-        this.singer.transposition = 0;
-        this.singer.transpositionValues = [];
-
-        this.singer.register = 0;
-        this.singer.beatFactor = 1;
-        this.singer.dotCount = 0;
-        this.singer.noteBeat = {};
-        this.singer.noteValue = {};
-        this.singer.oscList = {};
-        this.singer.noteDrums = {};
-        this.singer.notePitches = {};
-        this.singer.noteOctaves = {};
-        this.singer.noteCents = {};
-        this.singer.noteHertz = {};
-        this.singer.noteBeatValues = {};
-        this.singer.embeddedGraphics = {};
-        this.singer.lastNotePlayed = null;
-        this.singer.previousNotePlayed = null;
-        this.singer.noteStatus = null;
-        this.singer.noteDirection = 0;
-        this.singer.pitchNumberOffset = 39;
-        this.singer.currentOctave = 4;
-        this.singer.inHarmonic = [];
-        this.singer.partials = [];
-        this.singer.inNeighbor = [];
-        this.singer.neighborStepPitch = [];
-        this.singer.neighborNoteValue = [];
-        this.singer.inDefineMode = false;
-        this.singer.defineMode = [];
-
-        this.singer.notesPlayed = [0, 1];
-        this.singer.whichNoteToCount = 1;
-        this.singer.movable = false;
-
-        this.singer.bpm = [];
-        this.singer.previousTurtleTime = 0;
-        this.singer.turtleTime = 0;
-        this.singer.pushedNote = false;
-        this.singer.duplicateFactor = 1;
-        this.singer.inDuplicate = false;
-        this.singer.skipFactor = 1;
-        this.singer.skipIndex = 0;
-        this.singer.instrumentNames = [DEFAULTVOICE];
-        this.singer.inCrescendo = [];
-        this.singer.crescendoDelta = [];
-        this.singer.crescendoInitialVolume = { DEFAULTVOICE: [DEFAULTVOLUME] };
-        this.singer.intervals = [];
-        this.singer.semitoneIntervals = [];
-        this.singer.staccato = [];
-        this.singer.glide = [];
-        this.singer.glideOverride = 0;
-        this.singer.swing = [];
-        this.singer.swingTarget = [];
-        this.singer.swingCarryOver = 0;
-        this.singer.tie = false;
-        this.singer.tieNotePitches = [];
-        this.singer.tieNoteExtras = [];
-        this.singer.tieCarryOver = 0;
-        this.singer.tieFirstDrums = [];
-        this.singer.drift = 0;
-        this.singer.drumStyle = [];
-        this.singer.voices = [];
-        this.singer.backward = [];
-
-        this.singer.vibratoIntensity = [];
-        this.singer.vibratoRate = [];
-        this.singer.distortionAmount = [];
-        this.singer.tremoloFrequency = [];
-        this.singer.tremoloDepth = [];
-        this.singer.rate = [];
-        this.singer.octaves = [];
-        this.singer.baseFrequency = [];
-        this.singer.chorusRate = [];
-        this.singer.delayTime = [];
-        this.singer.chorusDepth = [];
-        this.singer.neighborArgNote1 = [];
-        this.singer.neighborArgNote2 = [];
-        this.singer.neighborArgBeat = [];
-        this.singer.neighborArgCurrentBeat = [];
-
-        this.singer.inNoteBlock = [];
-        this.singer.multipleVoices = false;
-        this.singer.invertList = [];
-        this.singer.beatList = [];
-        this.singer.factorList = [];
-        this.singer.keySignature = "C " + "major";
-        this.singer.pitchDrumTable = {};
-        this.singer.defaultStrongBeats = false;
-
-        this.singer.pickup = 0;
-        this.singer.beatsPerMeasure = 4; // default is 4/4 time
-        this.singer.noteValuePerBeat = 4;
-        this.singer.currentBeat = 0;
-        this.singer.currentMeasure = 0;
-
-        this.singer.justCounting = [];
-        this.singer.justMeasuring = [];
-        this.singer.firstPitch = [];
-        this.singer.lastPitch = [];
-        this.singer.suppressOutput = suppressOutput;
-
-        this.singer.dispatchFactor = 1;
-
-        this.singer.runningFromEvent = false;
+        // Delegated reset to Singer
+        this.singer.resetState(suppressOutput);
     }
 
     // ================================ CONTROLLER ============================
@@ -889,7 +790,8 @@ Turtle.TurtleView = class {
     }
 
     /**
-     * Adds a text object to the canvas.
+     * Adds a text object to the canvas with auto-wrapping.
+     * Supports both word-level and character-level wrapping for long text.
      *
      * @param  size - specifies text size
      * @param  myText - string of text to be displayed
@@ -900,38 +802,86 @@ Turtle.TurtleView = class {
         }
 
         const textList = typeof myText !== "string" ? [myText.toString()] : myText.split("\\n");
-
         const textSize = size.toString() + "px " + this.painter.font;
+
+        // Calculate max width based on stage canvas size and current turtle position
+        const stageCanvas = this.turtles.stage && this.turtles.stage.canvas;
+        const canvasWidth = stageCanvas ? stageCanvas.width : window.innerWidth;
+        const maxWidth = Math.max(100, canvasWidth - this.container.x - 20);
+
+        // Helper function to manually wrap text at character level
+        const wrapText = (str, maxW) => {
+            const lines = [];
+            const tempText = new createjs.Text("", textSize, this.painter.canvasColor);
+            let currentLine = "";
+
+            for (let j = 0; j < str.length; j++) {
+                const testLine = currentLine + str[j];
+                tempText.text = testLine;
+                const testWidth = tempText.getMeasuredWidth();
+
+                if (testWidth > maxW && currentLine.length > 0) {
+                    lines.push(currentLine);
+                    currentLine = str[j];
+                } else {
+                    currentLine = testLine;
+                }
+            }
+            if (currentLine.length > 0) {
+                lines.push(currentLine);
+            }
+            return lines.length > 0 ? lines : [str];
+        };
+
+        // Track vertical offset for wrapping lines
+        let currentYOffset = 0;
+
         for (let i = 0; i < textList.length; i++) {
-            const text = new createjs.Text(textList[i], textSize, this.painter.canvasColor);
-            text.textAlign = "left";
-            text.textBaseline = "alphabetic";
-            this.turtles.stage.addChild(text);
-            this._media.push(text);
-            text.x = this.container.x;
-            text.y = this.container.y + i * size;
-            text.rotation = this.orientation;
+            const content = textList[i];
 
-            const xScaled = text.x * this.turtles.scale;
-            const yScaled = text.y * this.turtles.scale;
-            const sizeScaled = size * this.turtles.scale;
-            this.painter.svgOutput +=
-                '<text x="' +
-                xScaled +
-                '" y = "' +
-                yScaled +
-                '" fill="' +
-                this.painter.canvasColor +
-                '" font-family = "' +
-                this.painter.font +
-                '" font-size = "' +
-                sizeScaled +
-                '">' +
-                myText +
-                "</text>";
+            // Wrap the text manually
+            const wrappedLines = wrapText(content, maxWidth);
 
-            this.activity.refreshCanvas();
+            for (let k = 0; k < wrappedLines.length; k++) {
+                const lineContent = wrappedLines[k];
+                const text = new createjs.Text(lineContent, textSize, this.painter.canvasColor);
+
+                text.textAlign = "center";
+                text.textBaseline = "alphabetic";
+
+                this.turtles.stage.addChild(text);
+                this._media.push(text);
+
+                // Center the text on the turtle's x position
+                text.x = this.container.x;
+                text.y = this.container.y + currentYOffset;
+                text.rotation = this.orientation;
+
+                // Increment offset by the line height
+                currentYOffset += text.getMeasuredHeight() + (size * 0.2);
+
+                const xScaled = text.x * this.turtles.scale;
+                const yScaled = text.y * this.turtles.scale;
+                const sizeScaled = size * this.turtles.scale;
+
+                this.painter.svgOutput +=
+                    '<text x="' +
+                    xScaled +
+                    '" y = "' +
+                    yScaled +
+                    '" fill="' +
+                    this.painter.canvasColor +
+                    '" font-family = "' +
+                    this.painter.font +
+                    '" font-size = "' +
+                    sizeScaled +
+                    '">' +
+                    lineContent +
+                    "</text>";
+            }
         }
+
+        this.activity.refreshCanvas();
     }
 
     /**

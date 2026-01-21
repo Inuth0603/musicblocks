@@ -206,6 +206,135 @@ class Singer {
         this.inverted = false; // tracks if the notes being played are inverted
     }
 
+    /**
+     * Resets the Singer's state variables to their default values.
+     * Called by Turtle.initTurtle to initialize/reset music-related state.
+     *
+     * @param {Boolean} suppressOutput - whether to suppress output
+     * @returns {void}
+     */
+    resetState(suppressOutput) {
+        // Parameters used by envelope block
+        /** @deprecated */ this.attack = [];
+        /** @deprecated */ this.decay = [];
+        /** @deprecated */ this.sustain = [];
+        /** @deprecated */ this.release = [];
+
+        // Parameters used by pitch
+        this.scalarTransposition = 0;
+        this.scalarTranspositionValues = [];
+        this.transposition = 0;
+        this.transpositionValues = [];
+
+        // Parameters used by notes
+        this.register = 0;
+        this.beatFactor = 1;
+        this.dotCount = 0;
+        this.noteBeat = {};
+        this.noteValue = {};
+        this.oscList = {};
+        this.noteDrums = {};
+        this.notePitches = {};
+        this.noteOctaves = {};
+        this.noteCents = {};
+        this.noteHertz = {};
+        this.noteBeatValues = {};
+        this.embeddedGraphics = {};
+        this.lastNotePlayed = null;
+        this.previousNotePlayed = null;
+        this.noteStatus = null;
+        this.noteDirection = 0;
+        this.pitchNumberOffset = 39;
+        this.currentOctave = 4;
+        this.inHarmonic = [];
+        this.partials = [];
+        this.inNeighbor = [];
+        this.neighborStepPitch = [];
+        this.neighborNoteValue = [];
+        this.inDefineMode = false;
+        this.defineMode = [];
+
+        // Music-related attributes
+        this.notesPlayed = [0, 1];
+        this.whichNoteToCount = 1;
+        this.movable = false;
+
+        // Parameters used by the note block
+        this.bpm = [];
+        this.previousTurtleTime = 0;
+        this.turtleTime = 0;
+        this.pushedNote = false;
+        this.duplicateFactor = 1;
+        this.inDuplicate = false;
+        this.skipFactor = 1;
+        this.skipIndex = 0;
+        this.instrumentNames = [DEFAULTVOICE];
+        this.inCrescendo = [];
+        this.crescendoDelta = [];
+        this.crescendoInitialVolume = { DEFAULTVOICE: [DEFAULTVOLUME] };
+        this.intervals = [];
+        this.semitoneIntervals = [];
+        this.staccato = [];
+        this.glide = [];
+        this.glideOverride = 0;
+        this.swing = [];
+        this.swingTarget = [];
+        this.swingCarryOver = 0;
+        this.tie = false;
+        this.tieNotePitches = [];
+        this.tieNoteExtras = [];
+        this.tieCarryOver = 0;
+        this.tieFirstDrums = [];
+        this.drift = 0;
+        this.drumStyle = [];
+        this.voices = [];
+        this.backward = [];
+
+        // Effects parameters
+        this.vibratoIntensity = [];
+        this.vibratoRate = [];
+        this.distortionAmount = [];
+        this.tremoloFrequency = [];
+        this.tremoloDepth = [];
+        this.rate = [];
+        this.octaves = [];
+        this.baseFrequency = [];
+        this.chorusRate = [];
+        this.delayTime = [];
+        this.chorusDepth = [];
+        this.neighborArgNote1 = [];
+        this.neighborArgNote2 = [];
+        this.neighborArgBeat = [];
+        this.neighborArgCurrentBeat = [];
+
+        this.inNoteBlock = [];
+        this.multipleVoices = false;
+        this.invertList = [];
+        this.beatList = [];
+        this.factorList = [];
+        this.keySignature = "C " + "major";
+        this.pitchDrumTable = {};
+        this.defaultStrongBeats = false;
+
+        // Parameters used in time signature
+        this.pickup = 0;
+        this.beatsPerMeasure = 4;
+        this.noteValuePerBeat = 4;
+        this.currentBeat = 0;
+        this.currentMeasure = 0;
+
+        // When counting notes, measuring intervals, or generating lilypond output
+        this.justCounting = [];
+        this.justMeasuring = [];
+        this.firstPitch = [];
+        this.lastPitch = [];
+        this.suppressOutput = suppressOutput;
+
+        this.dispatchFactor = 1;
+
+        this.runningFromEvent = false;
+    }
+
     // ========= Class variables ==============================================
     // Parameters used by notes
     static masterBPM = TARGETBPM;
@@ -305,17 +434,17 @@ class Singer {
                 noteObj[1],
                 steps > 0
                     ? getStepSizeUp(
-                          tur.singer.keySignature,
-                          noteObj[0],
-                          steps,
-                          logo.synth.inTemperament
-                      )
+                        tur.singer.keySignature,
+                        noteObj[0],
+                        steps,
+                        logo.synth.inTemperament
+                    )
                     : getStepSizeDown(
-                          tur.singer.keySignature,
-                          noteObj[0],
-                          steps,
-                          logo.synth.inTemperament
-                      ),
+                        tur.singer.keySignature,
+                        noteObj[0],
+                        steps,
+                        logo.synth.inTemperament
+                    ),
                 tur.singer.keySignature,
                 tur.singer.movable,
                 null,
@@ -1457,7 +1586,7 @@ class Singer {
         } else if (tur.singer.crescendoDelta.length > 0) {
             if (
                 last(tur.singer.synthVolume[DEFAULTVOICE]) ===
-                    last(tur.singer.crescendoInitialVolume[DEFAULTVOICE]) &&
+                last(tur.singer.crescendoInitialVolume[DEFAULTVOICE]) &&
                 tur.singer.justCounting.length === 0
             ) {
                 activity.logo.notation.notationBeginCrescendo(
@@ -1598,9 +1727,9 @@ class Singer {
                         for (let i = 0; i < tur.singer.tieNotePitches.length; i++) {
                             if (
                                 tur.singer.tieNotePitches[i][0] !=
-                                    tur.singer.notePitches[last(tur.singer.inNoteBlock)][i] ||
+                                tur.singer.notePitches[last(tur.singer.inNoteBlock)][i] ||
                                 tur.singer.tieNotePitches[i][1] !=
-                                    tur.singer.noteOctaves[last(tur.singer.inNoteBlock)][i]
+                                tur.singer.noteOctaves[last(tur.singer.inNoteBlock)][i]
                             ) {
                                 match = false;
                                 break;
@@ -1904,7 +2033,7 @@ class Singer {
                             if (
                                 i === j ||
                                 tur.singer.noteOctaves[thisBlk][i] !==
-                                    tur.singer.noteOctaves[thisBlk][j]
+                                tur.singer.noteOctaves[thisBlk][j]
                             ) {
                                 continue;
                             }
@@ -2044,9 +2173,9 @@ class Singer {
                     const notesFrequency = isCustomTemperament(activity.logo.synth.inTemperament)
                         ? activity.logo.synth.getCustomFrequency(notes)
                         : activity.logo.synth.getFrequency(
-                              notes,
-                              activity.logo.synth.changeInTemperament
-                          );
+                            notes,
+                            activity.logo.synth.changeInTemperament
+                        );
                     const startingPitch = activity.logo.synth.startingPitch;
                     const frequency = pitchToFrequency(
                         startingPitch.substring(0, startingPitch.length - 1),
@@ -2150,8 +2279,8 @@ class Singer {
                                     if (notes.length > 1) {
                                         activity.errorMsg(
                                             last(tur.singer.oscList[thisBlk]) +
-                                                ": " +
-                                                _("synth cannot play chords."),
+                                            ": " +
+                                            _("synth cannot play chords."),
                                             blk
                                         );
                                     }
