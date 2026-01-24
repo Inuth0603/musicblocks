@@ -1,23 +1,22 @@
 name: AI Policy Reminder
 
+# This workflow runs whenever a new Pull Request is opened
 on:
   pull_request:
     types: [opened]
 
 jobs:
-  ai-guidelines-check:
+  post-reminder:
     runs-on: ubuntu-latest
     permissions:
-      pull-requests: write
+      pull-requests: write  # Required to post comments
     steps:
-      - uses: actions/github-script@v7
+      - name: Post AI Policy Comment
+        uses: actions/github-script@v7
         with:
           script: |
-            const { owner, repo } = context.repo;
-            const issue_number = context.issue.number;
-            
-            // TODO: Move this message template to a separate config file or Wiki later
-            const body = `
+            // The message the bot will post
+            const message = `
             👋 **Thanks for your contribution!**
             
             🤖 **AI Usage Policy Reminder**
@@ -32,9 +31,10 @@ jobs:
             Happy coding! 🚀
             `;
 
+            // Post the comment to the PR
             await github.rest.issues.createComment({
-              owner,
-              repo,
-              issue_number,
-              body
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: message
             });
