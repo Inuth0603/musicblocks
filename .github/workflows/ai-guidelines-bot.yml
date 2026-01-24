@@ -1,0 +1,40 @@
+name: AI Policy Reminder
+
+# This workflow runs whenever a new Pull Request is opened
+on:
+  pull_request:
+    types: [opened]
+
+jobs:
+  post-reminder:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write  # Required to post comments
+    steps:
+      - name: Post AI Policy Comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // The message the bot will post
+            const message = `
+            👋 **Thanks for your contribution!**
+            
+            🤖 **AI Usage Policy Reminder**
+            Per Sugar Labs guidelines, if you used generative AI tools (ChatGPT, Claude, Copilot, etc.) to create this code, you **must disclose it** in the PR description.
+            
+            **Please include:**
+            1. The specific prompts you used.
+            2. The full conversation history (link or summary).
+            
+            > *If you did not use AI, you can ignore this message.*
+            
+            Happy coding! 🚀
+            `;
+
+            // Post the comment to the PR
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: message
+            });
